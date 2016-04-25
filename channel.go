@@ -579,7 +579,7 @@ func (c *Channel) messagePump() {
 						sum += thisLatency
 					}
 					for _,thisLength := range channelLength {
-						c.ctx.nsqd.logf(thisLength)
+						c.ctx.nsqd.logf("Length is: %d \n",thisLength)
 						totalLength += thisLength
 					}
 					
