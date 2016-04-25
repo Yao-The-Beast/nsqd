@@ -590,7 +590,7 @@ func (c *Channel) messagePump() {
 					x = strconv.FormatInt(averageLength, 10)
 					latencies = append(latencies,x...)
 					latencies = append(latencies, "\n"...)
-                    ioutil.WriteFile(("NSQ_OUTPUT/Yao:pump_to_client_queue"), latencies, 0777)
+                    ioutil.WriteFile(("NSQ_OUTPUT/pump_to_client_queue"), latencies, 0777)
                 }
             }
 		case buf = <-c.backend.ReadChan():

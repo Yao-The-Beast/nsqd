@@ -387,7 +387,7 @@ func (p *protocolV2) messagePump(client *clientV2, startedChan chan bool) {
 					x = strconv.FormatInt(averageLength, 10)
 					latencies = append(latencies,x...)
 					latencies = append(latencies, "\n"...)
-                    ioutil.WriteFile(("NSQ_OUTPUT/Yao:sent_to_subscriber"), latencies, 0777)
+                    ioutil.WriteFile(("NSQ_OUTPUT/send_to_subscriber"), latencies, 0777)
                 }
 			}
             
@@ -865,7 +865,7 @@ func (p *protocolV2) PUB(client *clientV2, params [][]byte) ([]byte, error) {
 			x:=strconv.FormatInt(averageLatency, 10)
 			topicLatencies = append(topicLatencies,x...)
 			topicLatencies = append(topicLatencies, "\n"...)
-			ioutil.WriteFile(("NSQ_OUTPUT/Yao:push_to_topic_queue"), topicLatencies, 0777)
+			ioutil.WriteFile(("NSQ_OUTPUT/push_to_topic_queue"), topicLatencies, 0777)
 		}
 	}
     
