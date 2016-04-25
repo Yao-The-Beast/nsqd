@@ -24,7 +24,7 @@ import (
 //yao
 var topicLatencies []byte
 var topicLat []int64
-var topicMessagesReceived = 0
+var topicMessagesReceived = int64(0)
 
 /*
 var sendLatencies []byte
@@ -266,7 +266,7 @@ func (p *protocolV2) messagePump(client *clientV2, startedChan chan bool) {
     var latencies []byte
 	var lat []int64;
 	var channelLength []int64 
-    messagesReceived := 0
+    messagesReceived := int64(0)
 
 	// v2 opportunistically buffers data to clients to reduce write system calls
 	// we force flush in two cases:

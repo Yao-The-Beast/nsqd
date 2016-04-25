@@ -552,7 +552,7 @@ func (c *Channel) messagePump() {
     var latencies []byte
 	var lat []int64
 	var channelLength []int64
-    messagesReceived := 0
+    messagesReceived := int64(0)
     
 	for {
 		// do an extra check for closed exit before we select on all the memory/backend/exitChan
@@ -583,7 +583,7 @@ func (c *Channel) messagePump() {
 						totalLength += thisLength
 					}
 					
-					averageLatency := int64(sum)/messagesReceived
+					averageLatency := int64(sum)/ messagesReceived
 					averageLength := int64(totalLength)/messagesReceived
 					x:=strconv.FormatInt(averageLatency, 10)
 					latencies = append(latencies,x...)
