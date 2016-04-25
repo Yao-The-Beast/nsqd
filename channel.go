@@ -579,12 +579,12 @@ func (c *Channel) messagePump() {
 						sum += thisLatency
 					}
 					for _,thisLength := range channelLength {
-						c.ctx.nsqd.logf("Length is: %d \n",thisLength)
+						//c.ctx.nsqd.logf("Length is: %d \n",thisLength)
 						totalLength += thisLength
 					}
 					
-					averageLatency := int64(sum)/int64(len(lat))
-					averageLength := int64(totalLength)/int64(len(channelLength))
+					averageLatency := int64(sum)/messagesReceived
+					averageLength := int64(totalLength)/messagesReceived
 					x:=strconv.FormatInt(averageLatency, 10)
 					latencies = append(latencies,x...)
 					latencies = append(latencies, "\n"...)

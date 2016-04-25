@@ -379,8 +379,8 @@ func (p *protocolV2) messagePump(client *clientV2, startedChan chan bool) {
 						totalLength += thisLength
 					}
 					
-					averageLatency := int64(sum)/int64(len(lat))
-					averageLength := int64(totalLength)/int64(len(channelLength))
+					averageLatency := int64(sum)/messagesReceived
+					averageLength := int64(totalLength)/messagesReceived
 					x:=strconv.FormatInt(averageLatency, 10)
 					latencies = append(latencies,x...)
 					latencies = append(latencies, "\n"...)
