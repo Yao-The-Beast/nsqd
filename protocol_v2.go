@@ -718,7 +718,9 @@ func (p *protocolV2) RDY(client *clientV2, params [][]byte) ([]byte, error) {
 			fmt.Sprintf("RDY count %d out of range 0-%d", count, p.ctx.nsqd.getOpts().MaxRdyCount))
 	}
 	//yao
-	p.ctx.nsqd.logf("CLIENT CHANNEL %s, READY COUNT: %d",client.Channel.name, count);
+	if count == 0 {
+		p.ctx.nsqd.logf("CLIENT CHANNEL %s, READY COUNT: %d",client.Channel.name, count);
+	}
 	
 	client.SetReadyCount(count)
 
