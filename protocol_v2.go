@@ -168,30 +168,6 @@ func (p *protocolV2) Send(client *clientV2, frameType int32, data []byte) error 
 		client.SetWriteDeadline(zeroTime)
 	}
 
-	
-/*	
-	//yao
-	msg, thisErr := decodeMessage(data);
-	if thisErr == nil && client != nil && client.Channel != nil && client.Channel.name == "0#ephemeral" {
-		sentTime, _ := binary.Varint(msg.Body)
-		now := time.Now().UnixNano()
-		
-		sendLat = append(sendLat, (now-sentTime)/1000,10)
-		sendMessages++;
-		//write to file
-		if sendMessages == 10000 {
-			sum := int64(0)
-			for _,thisLatency := range sendLat {
-				sum += thisLatency
-			}
-			averageLatency := int64(sum)/int64(len(sendLat))
-			x:=strconv.FormatInt(averageLatency, 10)
-			sendLatencies = append(sendLatencies,x...)
-			sendLatencies = ap pend(sendLatencies, "\n"...)
-			ioutil.WriteFile(("NSQ_OUTPUT/Yao:send_to_TCP"), sendLatencies, 0777)
-		}
-	}
-*/
 	_, err := protocol.SendFramedResponse(client.Writer, frameType, data)
 	
 	
@@ -365,8 +341,10 @@ func (p *protocolV2) messagePump(client *clientV2, startedChan chan bool) {
                 sentTime, _ := binary.Varint(msg.Body)
                 now := time.Now().UnixNano()
 			    
-				lat = append(lat, (now-sentTime)/1000,10)
-				channelLength = append(channelLength, int64(len(client.Channel.memoryMsgChan)))
+				if messagesReceived < 10000 {
+					lat = append(lat, (now-sentTime)/1000,10)
+					channelLength = append(channelLength, int64(len(client.Channel.memoryMsgChan)))
+				}
                 messagesReceived++;
                 //write to file
                 if messagesReceived == 10000 {
@@ -857,7 +835,9 @@ func (p *protocolV2) PUB(client *clientV2, params [][]byte) ([]byte, error) {
 		sentTime, _ := binary.Varint(msg.Body)
 		now := time.Now().UnixNano()
 		
-		topicLat = append(topicLat, (now-sentTime)/1000,10)
+		if topicMessagesReceived < 10000 {
+			topicLat = append(topicLat, (now-sentTime)/1000,10)
+		}
 		topicMessagesReceived++;
 		//write to file
 		if topicMessagesReceived == 10000 {
