@@ -341,13 +341,13 @@ func (p *protocolV2) messagePump(client *clientV2, startedChan chan bool) {
                 sentTime, _ := binary.Varint(msg.Body)
                 now := time.Now().UnixNano()
 			    
-				if messagesReceived < 10000 {
+				if messagesReceived < 1000 {
 					lat = append(lat, (now-sentTime)/1000,10)
 					channelLength = append(channelLength, int64(len(client.Channel.memoryMsgChan)))
 				}
                 messagesReceived++;
                 //write to file
-                if messagesReceived == 10000 {
+                if messagesReceived == 1000 {
 					sum := int64(0)
 					totalLength := int64(0)
 					for _,thisLatency := range lat {
@@ -835,12 +835,12 @@ func (p *protocolV2) PUB(client *clientV2, params [][]byte) ([]byte, error) {
 		sentTime, _ := binary.Varint(msg.Body)
 		now := time.Now().UnixNano()
 		
-		if topicMessagesReceived < 10000 {
+		if topicMessagesReceived < 1000 {
 			topicLat = append(topicLat, (now-sentTime)/1000,10)
 		}
 		topicMessagesReceived++;
 		//write to file
-		if topicMessagesReceived == 10000 {
+		if topicMessagesReceived == 1000 {
 			sum := int64(0)
 			for _,thisLatency := range topicLat {
 				sum += thisLatency

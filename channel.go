@@ -568,13 +568,13 @@ func (c *Channel) messagePump() {
                 sentTime, _ := binary.Varint(msg.Body)
                 now := time.Now().UnixNano()
 			    
-				if messagesReceived < 10000 {
+				if messagesReceived < 1000 {
 					lat = append(lat, (now-sentTime)/1000,10)
 					channelLength = append(channelLength, int64(len(c.memoryMsgChan)))
 				}
                 messagesReceived++;
                 //write to file
-                if messagesReceived == 10000 {
+                if messagesReceived == 1000 {
 					sum := int64(0)
 					totalLength := int64(0)
 					for _,thisLatency := range lat {
