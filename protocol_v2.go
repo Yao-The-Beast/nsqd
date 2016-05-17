@@ -288,7 +288,7 @@ func (p *protocolV2) messagePump(client *clientV2, startedChan chan bool) {
 			// in either case, force flush
 			client.writeLock.Lock()
 			err = client.Flush()
-			client.ctx.nsqd.logf("Yao:Flushed")
+		//	client.ctx.nsqd.logf("Yao:Flushed")
 			client.writeLock.Unlock()
 			if err != nil {
 				goto exit
