@@ -182,7 +182,7 @@ func (c *clientV2) Identify(data identifyDataV2) error {
 	if err != nil {
 		return err
 	}
-
+	c.ctx.nsqd.logf("Yao: Buffer Timeout %d", data.OutputBufferTimeout)
 	err = c.SetOutputBufferTimeout(data.OutputBufferTimeout)
 	if err != nil {
 		return err
