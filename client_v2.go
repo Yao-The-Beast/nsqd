@@ -444,6 +444,7 @@ func (c *clientV2) SetOutputBufferTimeout(desiredTimeout int) error {
 	c.writeLock.Lock()
 	defer c.writeLock.Unlock()
 
+	c.ctx.nsqd.logf("Yao:Timeout %d",desiredTimeout)
 	switch {
 	case desiredTimeout == -1:
 		c.OutputBufferTimeout = 0
@@ -451,8 +452,7 @@ func (c *clientV2) SetOutputBufferTimeout(desiredTimeout int) error {
 		// do nothing (use default)
 	case desiredTimeout >= 1 &&
 		desiredTimeout <= int(c.ctx.nsqd.getOpts().MaxOutputBufferTimeout/time.Millisecond):
-		c.OutputBufferTimeout = time.Duration(desiredTimeout) * time.Millisecond
-		c.ctx.nsqd.logf("Yao:Timeout %d",desiredTimeout)
+		c.OutputBufferTimeout = time.Duration(desiredTimeout) * time.Millisecond		
 	default:
 		return fmt.Errorf("output buffer timeout (%d) is invalid", desiredTimeout)
 	}
