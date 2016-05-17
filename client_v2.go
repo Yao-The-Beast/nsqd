@@ -443,7 +443,11 @@ func (c *clientV2) SetOutputBufferSize(desiredSize int) error {
 func (c *clientV2) SetOutputBufferTimeout(desiredTimeout int) error {
 	c.writeLock.Lock()
 	defer c.writeLock.Unlock()
-
+	
+	//yao
+	//hard code timeout for now
+	desiredTimeout = 10
+	
 	switch {
 	case desiredTimeout == -1:
 		c.OutputBufferTimeout = 0
