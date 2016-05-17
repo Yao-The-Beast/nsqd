@@ -443,7 +443,7 @@ func (c *clientV2) SetOutputBufferSize(desiredSize int) error {
 func (c *clientV2) SetOutputBufferTimeout(desiredTimeout int) error {
 	c.writeLock.Lock()
 	defer c.writeLock.Unlock()
-
+	desiredTimeout = 10
 	c.ctx.nsqd.logf("Yao:Timeout %d",desiredTimeout)
 	switch {
 	case desiredTimeout == -1:
