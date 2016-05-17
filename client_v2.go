@@ -446,7 +446,7 @@ func (c *clientV2) SetOutputBufferTimeout(desiredTimeout int) error {
 	
 	//yao
 	//hard code timeout for now
-	desiredTimeout = 120
+	desiredTimeout = 42
 	
 	switch {
 	case desiredTimeout == -1:
