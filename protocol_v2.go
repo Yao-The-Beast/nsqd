@@ -7,30 +7,18 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
-    "strconv"
 	"math"
 	"math/rand"
 	"net"
 	"sync/atomic"
 	"time"
 	"unsafe"
+	"io/ioutil"
+    "strconv"
 
 	"github.com/nsqio/nsq/internal/protocol"
 	"github.com/nsqio/nsq/internal/version"
 )
-
-
-//yao
-var topicLatencies []byte
-var topicLat []int64
-var topicMessagesReceived = int64(0)
-
-/*
-var sendLatencies []byte
-var sendLat []int64
-var sendMessages = 0
-*/
 
 const maxTimeout = time.Hour
 
@@ -43,6 +31,11 @@ const (
 var separatorBytes = []byte(" ")
 var heartbeatBytes = []byte("_heartbeat_")
 var okBytes = []byte("OK")
+
+//yao
+var topicLatencies []byte
+var topicLat []int64
+var topicMessagesReceived = int64(0)
 
 type protocolV2 struct {
 	ctx *context
@@ -117,7 +110,7 @@ func (p *protocolV2) IOLoop(conn net.Conn) error {
 			}
 			continue
 		}
-        
+
 		if response != nil {
 			err = p.Send(client, frameTypeResponse, response)
 			if err != nil {
@@ -143,13 +136,12 @@ func (p *protocolV2) SendMessage(client *clientV2, msg *Message, buf *bytes.Buff
 			msg.ID, client, msg.Body)
 	}
 
-    
 	buf.Reset()
 	_, err := msg.WriteTo(buf)
 	if err != nil {
 		return err
 	}
-    
+
 	err = p.Send(client, frameTypeMessage, buf.Bytes())
 	if err != nil {
 		return err
@@ -169,8 +161,6 @@ func (p *protocolV2) Send(client *clientV2, frameType int32, data []byte) error 
 	}
 
 	_, err := protocol.SendFramedResponse(client.Writer, frameType, data)
-	
-	
 	if err != nil {
 		client.writeLock.Unlock()
 		return err
@@ -223,7 +213,8 @@ func (p *protocolV2) Exec(client *clientV2, params [][]byte) ([]byte, error) {
 func (p *protocolV2) messagePump(client *clientV2, startedChan chan bool) {
 	var err error
 	var buf bytes.Buffer
-	var clientMsgChan chan *Message
+	var memoryMsgChan chan *Message
+	var backendMsgChan chan []byte
 	var subChannel *Channel
 	// NOTE: `flusherChan` is used to bound message latency for
 	// the pathological case of a channel on a low volume topic
@@ -237,8 +228,8 @@ func (p *protocolV2) messagePump(client *clientV2, startedChan chan bool) {
 	heartbeatTicker := time.NewTicker(client.HeartbeatInterval)
 	heartbeatChan := heartbeatTicker.C
 	msgTimeout := client.MsgTimeout
-    
-    //yao
+	
+	//yao
     var latencies []byte
 	var lat []int64;
 	var channelLength []int64 
@@ -259,7 +250,8 @@ func (p *protocolV2) messagePump(client *clientV2, startedChan chan bool) {
 	for {
 		if subChannel == nil || !client.IsReadyForMessages() {
 			// the client is not ready to receive messages...
-			clientMsgChan = nil
+			memoryMsgChan = nil
+			backendMsgChan = nil
 			flusherChan = nil
 			// force flush
 			client.writeLock.Lock()
@@ -272,12 +264,14 @@ func (p *protocolV2) messagePump(client *clientV2, startedChan chan bool) {
 		} else if flushed {
 			// last iteration we flushed...
 			// do not select on the flusher ticker channel
-			clientMsgChan = subChannel.clientMsgChan
+			memoryMsgChan = subChannel.memoryMsgChan
+			backendMsgChan = subChannel.backend.ReadChan()
 			flusherChan = nil
 		} else {
 			// we're buffered (if there isn't any more data we should flush)...
 			// select on the flusher ticker channel, too
-			clientMsgChan = subChannel.clientMsgChan
+			memoryMsgChan = subChannel.memoryMsgChan
+			backendMsgChan = subChannel.backend.ReadChan()
 			flusherChan = outputBufferTicker.C
 		}
 
@@ -288,7 +282,6 @@ func (p *protocolV2) messagePump(client *clientV2, startedChan chan bool) {
 			// in either case, force flush
 			client.writeLock.Lock()
 			err = client.Flush()
-		//	client.ctx.nsqd.logf("Yao:Flushed")
 			client.writeLock.Unlock()
 			if err != nil {
 				goto exit
@@ -324,20 +317,36 @@ func (p *protocolV2) messagePump(client *clientV2, startedChan chan bool) {
 			if err != nil {
 				goto exit
 			}
-		case msg, ok := <-clientMsgChan:
-			if !ok {
-				goto exit
-			}
-
+		case b := <-backendMsgChan:
 			if sampleRate > 0 && rand.Int31n(100) > sampleRate {
 				continue
 			}
 
+			msg, err := decodeMessage(b)
+			if err != nil {
+				p.ctx.nsqd.logf("ERROR: failed to decode message - %s", err)
+				continue
+			}
+			msg.Attempts++
+
 			subChannel.StartInFlightTimeout(msg, client.ID, msgTimeout)
 			client.SendingMessage()
 			err = p.SendMessage(client, msg, &buf)
+			if err != nil {
+				goto exit
+			}
+			flushed = false
+		case msg := <-memoryMsgChan:
+			if sampleRate > 0 && rand.Int31n(100) > sampleRate {
+				continue
+			}
+			msg.Attempts++
 
-            //yao
+			subChannel.StartInFlightTimeout(msg, client.ID, msgTimeout)
+			client.SendingMessage()
+			err = p.SendMessage(client, msg, &buf)
+			
+			//yao
 			if client.Channel.name == "0#ephemeral" {
                 sentTime, _ := binary.Varint(msg.Body)
                 now := time.Now().UnixNano()
@@ -367,9 +376,9 @@ func (p *protocolV2) messagePump(client *clientV2, startedChan chan bool) {
 					latencies = append(latencies,x...)
 					latencies = append(latencies, "\n"...)
                     ioutil.WriteFile(("NSQ_OUTPUT/send_to_subscriber"), latencies, 0777)
-                }
+				}
 			}
-            
+			
 			if err != nil {
 				goto exit
 			}
@@ -696,11 +705,7 @@ func (p *protocolV2) RDY(client *clientV2, params [][]byte) ([]byte, error) {
 		return nil, protocol.NewFatalClientErr(nil, "E_INVALID",
 			fmt.Sprintf("RDY count %d out of range 0-%d", count, p.ctx.nsqd.getOpts().MaxRdyCount))
 	}
-	//yao
-	if count == 0 {
-		p.ctx.nsqd.logf("CLIENT CHANNEL %s, READY COUNT: %d",client.Channel.name, count);
-	}
-	
+
 	client.SetReadyCount(count)
 
 	return nil, nil
@@ -733,8 +738,6 @@ func (p *protocolV2) FIN(client *clientV2, params [][]byte) ([]byte, error) {
 }
 
 func (p *protocolV2) REQ(client *clientV2, params [][]byte) ([]byte, error) {
-
-    
 	state := atomic.LoadInt32(&client.State)
 	if state != stateSubscribed && state != stateClosing {
 		return nil, protocol.NewFatalClientErr(nil, "E_INVALID", "cannot REQ in current state")
@@ -789,14 +792,11 @@ func (p *protocolV2) NOP(client *clientV2, params [][]byte) ([]byte, error) {
 func (p *protocolV2) PUB(client *clientV2, params [][]byte) ([]byte, error) {
 	var err error
 
-
 	if len(params) < 2 {
 		return nil, protocol.NewFatalClientErr(nil, "E_INVALID", "PUB insufficient number of parameters")
 	}
 
 	topicName := string(params[1])
-
-
 	if !protocol.IsValidTopicName(topicName) {
 		return nil, protocol.NewFatalClientErr(nil, "E_BAD_TOPIC",
 			fmt.Sprintf("PUB topic name %q is not valid", topicName))
@@ -830,7 +830,7 @@ func (p *protocolV2) PUB(client *clientV2, params [][]byte) ([]byte, error) {
 	topic := p.ctx.nsqd.GetTopic(topicName)
 	msg := NewMessage(<-p.ctx.nsqd.idChan, messageBody)
 	err = topic.PutMessage(msg)
-
+	
 	//yao
 	if topicName == "0#ephemeral" {
 		sentTime, _ := binary.Varint(msg.Body)
@@ -853,11 +853,10 @@ func (p *protocolV2) PUB(client *clientV2, params [][]byte) ([]byte, error) {
 			ioutil.WriteFile(("NSQ_OUTPUT/push_to_topic_queue"), topicLatencies, 0777)
 		}
 	}
-    
 	
 	if err != nil {
 		return nil, protocol.NewFatalClientErr(err, "E_PUB_FAILED", "PUB failed "+err.Error())
-    }
+	}
 
 	return okBytes, nil
 }

@@ -3,15 +3,12 @@ package nsqd
 import (
 	"bytes"
 	"container/heap"
-    "encoding/binary"
 	"errors"
 	"math"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
-    "strconv"
-    "io/ioutil"
 
 	"github.com/nsqio/nsq/internal/pqueue"
 	"github.com/nsqio/nsq/internal/quantile"
@@ -49,8 +46,6 @@ type Channel struct {
 	backend BackendQueue
 
 	memoryMsgChan chan *Message
-	clientMsgChan chan *Message
-	exitChan      chan int
 	exitFlag      int32
 	exitMutex     sync.RWMutex
 
@@ -71,9 +66,6 @@ type Channel struct {
 	inFlightMessages map[MessageID]*Message
 	inFlightPQ       inFlightPqueue
 	inFlightMutex    sync.Mutex
-
-	// stat counters
-	bufferedCount int32
 }
 
 // NewChannel creates a new instance of the Channel type and returns a pointer
@@ -84,8 +76,6 @@ func NewChannel(topicName string, channelName string, ctx *context,
 		topicName:      topicName,
 		name:           channelName,
 		memoryMsgChan:  make(chan *Message, ctx.nsqd.getOpts().MemQueueSize),
-		clientMsgChan:  make(chan *Message),
-		exitChan:       make(chan int),
 		clients:        make(map[int64]Consumer),
 		deleteCallback: deleteCallback,
 		ctx:            ctx,
@@ -114,8 +104,6 @@ func NewChannel(topicName string, channelName string, ctx *context,
 			ctx.nsqd.getOpts().SyncTimeout,
 			ctx.nsqd.getOpts().Logger)
 	}
-
-	go c.messagePump()
 
 	c.ctx.nsqd.Notify(c)
 
@@ -177,8 +165,6 @@ func (c *Channel) exit(deleted bool) error {
 	}
 	c.RUnlock()
 
-	close(c.exitChan)
-
 	if deleted {
 		// empty the queue (deletes the backend files, too)
 		c.Empty()
@@ -199,15 +185,8 @@ func (c *Channel) Empty() error {
 		client.Empty()
 	}
 
-	clientMsgChan := c.clientMsgChan
 	for {
 		select {
-		case _, ok := <-clientMsgChan:
-			if !ok {
-				// c.clientMsgChan may be closed while in this loop
-				// so just remove it from the select so we can make progress
-				clientMsgChan = nil
-			}
 		case <-c.memoryMsgChan:
 		default:
 			goto finish
@@ -222,13 +201,6 @@ finish:
 // it does not drain inflight/deferred because it is only called in Close()
 func (c *Channel) flush() error {
 	var msgBuf bytes.Buffer
-
-	// messagePump is responsible for closing the channel it writes to
-	// this will read until it's closed (exited)
-	for msg := range c.clientMsgChan {
-		c.ctx.nsqd.logf("CHANNEL(%s): recovered buffered message from clientMsgChan", c.name)
-		writeMessageToBackend(&msgBuf, msg, c.backend)
-	}
 
 	if len(c.memoryMsgChan) > 0 || len(c.inFlightMessages) > 0 || len(c.deferredMessages) > 0 {
 		c.ctx.nsqd.logf("CHANNEL(%s): flushing %d memory %d in-flight %d deferred messages to backend",
@@ -267,7 +239,7 @@ finish:
 }
 
 func (c *Channel) Depth() int64 {
-	return int64(len(c.memoryMsgChan)) + c.backend.Depth() + int64(atomic.LoadInt32(&c.bufferedCount))
+	return int64(len(c.memoryMsgChan)) + c.backend.Depth()
 }
 
 func (c *Channel) Pause() error {
@@ -312,7 +284,6 @@ func (c *Channel) PutMessage(m *Message) error {
 	if err != nil {
 		return err
 	}
-    
 	atomic.AddUint64(&c.messageCount, 1)
 	return nil
 }
@@ -540,85 +511,6 @@ func (c *Channel) addToDeferredPQ(item *pqueue.Item) {
 	c.deferredMutex.Unlock()
 }
 
-// messagePump reads messages from either memory or backend and sends
-// messages to clients over a go chan
-func (c *Channel) messagePump() {
-    
-	var msg *Message
-	var buf []byte
-	var err error
-    
-    //yao
-    var latencies []byte
-	var lat []int64
-	var channelLength []int64
-    messagesReceived := int64(0)
-    
-	for {
-		// do an extra check for closed exit before we select on all the memory/backend/exitChan
-		// this solves the case where we are closed and something else is draining clientMsgChan into
-		// backend. we don't want to reverse that
-		if atomic.LoadInt32(&c.exitFlag) == 1 {
-			goto exit
-		}
-		select {
-		case msg = <-c.memoryMsgChan:
-            //yao
-            if c.name == "0#ephemeral" {
-                sentTime, _ := binary.Varint(msg.Body)
-                now := time.Now().UnixNano()
-			    
-				if messagesReceived < 1000 {
-					lat = append(lat, (now-sentTime)/1000,10)
-					channelLength = append(channelLength, int64(len(c.memoryMsgChan)))
-				}
-                messagesReceived++;
-                //write to file
-                if messagesReceived == 1000 {
-					sum := int64(0)
-					totalLength := int64(0)
-					for _,thisLatency := range lat {
-						sum += thisLatency
-					}
-					for _,thisLength := range channelLength {
-						//c.ctx.nsqd.logf("Length is: %d \n",thisLength)
-						totalLength += thisLength
-					}
-					
-					averageLatency := int64(sum)/ messagesReceived
-					averageLength := int64(totalLength)/messagesReceived
-					x:=strconv.FormatInt(averageLatency, 10)
-					latencies = append(latencies,x...)
-					latencies = append(latencies, "\n"...)
-					x = strconv.FormatInt(averageLength, 10)
-					latencies = append(latencies,x...)
-					latencies = append(latencies, "\n"...)
-                    ioutil.WriteFile(("NSQ_OUTPUT/pump_to_client_queue"), latencies, 0777)
-                }
-            }
-		case buf = <-c.backend.ReadChan():
-			msg, err = decodeMessage(buf)
-			if err != nil {
-				c.ctx.nsqd.logf("ERROR: failed to decode message - %s", err)
-				continue
-			}
-		case <-c.exitChan:
-			goto exit 
-		}
-        
-		msg.Attempts++
-   
-		atomic.StoreInt32(&c.bufferedCount, 1)
-		c.clientMsgChan <- msg
-		atomic.StoreInt32(&c.bufferedCount, 0)
-		// the client will call back to mark as in-flight w/ its info
-    }
-
-exit:
-	c.ctx.nsqd.logf("CHANNEL(%s): closing ... messagePump", c.name)
-	close(c.clientMsgChan)
-}
-
 func (c *Channel) processDeferredQueue(t int64) bool {
 	c.exitMutex.RLock()
 	defer c.exitMutex.RUnlock()
@@ -651,7 +543,6 @@ exit:
 }
 
 func (c *Channel) processInFlightQueue(t int64) bool {
-    
 	c.exitMutex.RLock()
 	defer c.exitMutex.RUnlock()
 
@@ -671,8 +562,6 @@ func (c *Channel) processInFlightQueue(t int64) bool {
 		dirty = true
 
 		_, err := c.popInFlightMessage(msg.clientID, msg.ID)
-        
-
 		if err != nil {
 			goto exit
 		}

@@ -6,10 +6,6 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
-    "time"
-    "io/ioutil"
-    "strconv"
-    "encoding/binary"
 
 	"github.com/nsqio/nsq/internal/quantile"
 	"github.com/nsqio/nsq/internal/util"
@@ -157,7 +153,6 @@ func (t *Topic) DeleteExistingChannel(channelName string) error {
 
 // PutMessage writes a Message to the queue
 func (t *Topic) PutMessage(m *Message) error {
-   
 	t.RLock()
 	defer t.RUnlock()
 	if atomic.LoadInt32(&t.exitFlag) == 1 {
@@ -213,17 +208,12 @@ func (t *Topic) Depth() int64 {
 // messagePump selects over the in-memory and backend queue and
 // writes messages to every channel for this topic
 func (t *Topic) messagePump() {
-    
 	var msg *Message
 	var buf []byte
 	var err error
 	var chans []*Channel
 	var memoryMsgChan chan *Message
 	var backendChan chan []byte
-    
-    //yao
-    var latencies []byte
-    messagesReceived := 0
 
 	t.RLock()
 	for _, c := range t.channelMap {
@@ -289,21 +279,6 @@ func (t *Topic) messagePump() {
 				continue
 			}
 			err := channel.PutMessage(chanMsg)
-            
-            //yao
-            if channel.name == "0" {
-                sentTime, _ := binary.Varint(msg.Body)
-                now := time.Now().UnixNano()
-			    x:=strconv.FormatInt((now-sentTime)/1000, 10)
-			    latencies = append(latencies, x...)
-			    latencies = append(latencies, "\n"...)
-                messagesReceived++;
-                //write to file
-                if messagesReceived == 10000 {
-                    ioutil.WriteFile(("/Users/drtailor/Desktop/NSQ/Yao:put_into_each_channel"), latencies, 0777)
-                }
-            }
-            
 			if err != nil {
 				t.ctx.nsqd.logf(
 					"TOPIC(%s) ERROR: failed to put msg(%s) to channel(%s) - %s",
