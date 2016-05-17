@@ -346,7 +346,6 @@ func (p *protocolV2) messagePump(client *clientV2, startedChan chan bool) {
 					lat = append(lat, (now-sentTime)/1000,10)
 					channelLength = append(channelLength, int64(len(client.Channel.memoryMsgChan)))
 				}
-				client.Channel.bufferedCount
                 messagesReceived++;
                 //write to file
                 if messagesReceived == 1000 {
