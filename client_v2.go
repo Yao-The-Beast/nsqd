@@ -452,6 +452,7 @@ func (c *clientV2) SetOutputBufferTimeout(desiredTimeout int) error {
 	case desiredTimeout >= 1 &&
 		desiredTimeout <= int(c.ctx.nsqd.getOpts().MaxOutputBufferTimeout/time.Millisecond):
 		c.OutputBufferTimeout = time.Duration(desiredTimeout) * time.Millisecond
+		c.ctx.nsqd.logf("Yao:Timeout %d",desiredTimeout)
 	default:
 		return fmt.Errorf("output buffer timeout (%d) is invalid", desiredTimeout)
 	}
