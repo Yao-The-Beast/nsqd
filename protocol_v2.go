@@ -288,7 +288,9 @@ func (p *protocolV2) messagePump(client *clientV2, startedChan chan bool) {
 			}
 			flushed = true
 			//yao
-			client.ctx.nsqd.logf("Yao: Timeout Flushed %d", messagesReceived)
+			if  client.Channel.name == "0#ephemeral" {
+				client.ctx.nsqd.logf("Yao: Timeout Flushed %d", messagesReceived)
+			}
 		case <-client.ReadyStateChan:
 		case subChannel = <-subEventChan:
 			// you can't SUB anymore
