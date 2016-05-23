@@ -182,8 +182,6 @@ func (c *clientV2) Identify(data identifyDataV2) error {
 	if err != nil {
 		return err
 	}
-	c.ctx.nsqd.logf("Yao: Buffer Size %d", data.OutputBufferSize)
-	c.ctx.nsqd.logf("Yao: Buffer Timeout %d", data.OutputBufferTimeout)
 	err = c.SetOutputBufferTimeout(data.OutputBufferTimeout)
 	if err != nil {
 		return err
@@ -554,7 +552,15 @@ func (c *clientV2) Flush() error {
 		c.SetWriteDeadline(zeroTime)
 	}
 
+	//yao
+	if c.Channel.name == "0#ephemeral" {
+		c.ctx.nsqd.logf("Yao: Available Space Before is: %d", c.Writer.Available())
+	}
 	err := c.Writer.Flush()
+	if c.Channel.name == "0#ephemeral" {
+		c.ctx.nsqd.logf("Yao: Available Space After is: %d", c.Writer.Available())
+	}
+	
 	if err != nil {
 		return err
 	}
