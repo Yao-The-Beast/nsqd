@@ -287,6 +287,8 @@ func (p *protocolV2) messagePump(client *clientV2, startedChan chan bool) {
 				goto exit
 			}
 			flushed = true
+			//yao
+			client.ctx.nsqd.logf("Yao: Timeout Flushed %d", messagesReceived)
 		case <-client.ReadyStateChan:
 		case subChannel = <-subEventChan:
 			// you can't SUB anymore
