@@ -553,11 +553,11 @@ func (c *clientV2) Flush() error {
 	}
 
 	//yao
-	if c != nil && c.Channel != nil && c.Channel.name != nil && c.Channel.name == "0#ephemeral" {
+	if c != nil && c.Channel != nil && c.Channel.name == "0#ephemeral" {
 		c.ctx.nsqd.logf("Yao: Available Space Before is: %d", c.Writer.Available())
 	}
 	err := c.Writer.Flush()
-	if c != nil && c.Channel != nil && c.Channel.name != nil && c.Channel.name == "0#ephemeral" {
+	if c != nil && c.Channel != nil && c.Channel.name == "0#ephemeral" {
 		c.ctx.nsqd.logf("Yao: Available Space After is: %d", c.Writer.Available())
 	}
 	
