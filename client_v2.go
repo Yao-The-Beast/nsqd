@@ -182,10 +182,8 @@ func (c *clientV2) Identify(data identifyDataV2) error {
 	if err != nil {
 		return err
 	}
-	//yao
 	c.ctx.nsqd.logf("Yao: Buffer Size %d", data.OutputBufferSize)
 	c.ctx.nsqd.logf("Yao: Buffer Timeout %d", data.OutputBufferTimeout)
-	data.OutputBufferSize = 60
 	err = c.SetOutputBufferTimeout(data.OutputBufferTimeout)
 	if err != nil {
 		return err
@@ -446,7 +444,10 @@ func (c *clientV2) SetOutputBufferSize(desiredSize int) error {
 func (c *clientV2) SetOutputBufferTimeout(desiredTimeout int) error {
 	c.writeLock.Lock()
 	defer c.writeLock.Unlock()
-
+	
+	//yao
+	//hard code timeout for now
+	desiredTimeout = 60
 	
 	switch {
 	case desiredTimeout == -1:

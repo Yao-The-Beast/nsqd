@@ -363,22 +363,21 @@ func (p *protocolV2) messagePump(client *clientV2, startedChan chan bool) {
                 //write to file
                 if messagesReceived == 1000 {
 					sum := int64(0)
-					totalLength := int64(0)
 					for _,thisLatency := range lat {
 						sum += thisLatency
 					}
-					for _,thisLength := range channelLength {
-						totalLength += thisLength
-					}
-					
+
 					averageLatency := int64(sum)/messagesReceived
-					averageLength := int64(totalLength)/messagesReceived
 					x:=strconv.FormatInt(averageLatency, 10)
 					latencies = append(latencies,x...)
 					latencies = append(latencies, "\n"...)
-					x = strconv.FormatInt(averageLength, 10)
-					latencies = append(latencies,x...)
-					latencies = append(latencies, "\n"...)
+					
+					for _,thisLength := range channelLength {
+						x = strconv.FormatInt(thisLength, 10)
+						latencies = append(latencies,x...)
+						latencies = append(latencies, "\n"...)
+					}
+
                     ioutil.WriteFile(("NSQ_OUTPUT/send_to_subscriber"), latencies, 0777)
 				}
 			}
