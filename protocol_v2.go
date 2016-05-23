@@ -354,12 +354,14 @@ func (p *protocolV2) messagePump(client *clientV2, startedChan chan bool) {
 			
 			//yao
 			if client.Channel.name == "0#ephemeral" {
+				
                 sentTime, _ := binary.Varint(msg.Body)
                 now := time.Now().UnixNano()
 			    
 				if messagesReceived < 1000 {
 					lat = append(lat, (now-sentTime)/1000,10)
 					channelLength = append(channelLength, int64(len(client.Channel.memoryMsgChan)))
+					client.ctx.nsqd.logf("Yao: Message Pump Underlying Buffer has a size of: %d, Msg Id: %d", client.Writer.Buffered(), messagesReceived)
 				}
                 messagesReceived++;
                 //write to file
