@@ -288,11 +288,11 @@ func (p *protocolV2) messagePump(client *clientV2, startedChan chan bool) {
 			}
 			flushed = true
 			//yao
-			
+		/*
 			if  client.Channel.name == "0#ephemeral" {
 				client.ctx.nsqd.logf("Yao: Timeout Flushed %d", messagesReceived)
 			}
-			
+		*/	
 		case <-client.ReadyStateChan:
 		case subChannel = <-subEventChan:
 			// you can't SUB anymore
@@ -360,8 +360,8 @@ func (p *protocolV2) messagePump(client *clientV2, startedChan chan bool) {
 			    
 				if messagesReceived < 1000 {
 					lat = append(lat, (now-sentTime)/1000,10)
-					channelLength = append(channelLength, int64(len(client.Channel.memoryMsgChan)))
-					client.ctx.nsqd.logf("Yao: Message Pump Underlying Buffer has a size of: %d, Msg Id: %d", client.Writer.Buffered() / 1024, messagesReceived)
+				//	channelLength = append(channelLength, int64(len(client.Channel.memoryMsgChan)))
+				//	client.ctx.nsqd.logf("Yao: Message Pump Underlying Buffer has a size of: %d, Msg Id: %d", client.Writer.Buffered() / 1024, messagesReceived)
 				}
                 messagesReceived++;
                 //write to file
@@ -375,13 +375,13 @@ func (p *protocolV2) messagePump(client *clientV2, startedChan chan bool) {
 					x:=strconv.FormatInt(averageLatency, 10)
 					latencies = append(latencies,x...)
 					latencies = append(latencies, "\n"...)
-					
+				/*
 					for _,thisLength := range channelLength {
 						x = strconv.FormatInt(thisLength, 10)
 						latencies = append(latencies,x...)
 						latencies = append(latencies, "\n"...)
 					}
-
+				*/
                     ioutil.WriteFile(("NSQ_OUTPUT/send_to_subscriber"), latencies, 0777)
 				}
 			}
