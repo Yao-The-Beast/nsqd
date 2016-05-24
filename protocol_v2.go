@@ -232,7 +232,7 @@ func (p *protocolV2) messagePump(client *clientV2, startedChan chan bool) {
 	//yao
     var latencies []byte
 	var lat []int64;
-	var channelLength []int64 
+//	var channelLength []int64 
     messagesReceived := int64(0)
 
 	// v2 opportunistically buffers data to clients to reduce write system calls
